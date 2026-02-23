@@ -1,0 +1,82 @@
+version: "3.9"
+
+# ============================================================
+# Janna AI - Production-like Docker Compose
+# ============================================================
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: janna-postgres
+    environment:
+      POSTGRES_USER: janna
+      POSTGRES_PASSWORD: janna_dev_password
+      POSTGRES_DB: janna_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U janna -d janna_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: janna-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: janna-api
+    env_file:
+      - .env.local
+    environment:
+      DATABASE_URL: postgresql://janna:janna_dev_password@postgres:5432/janna_db
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: production
+      API_PORT: "3001"
+      API_HOST: "0.0.0.0"
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: janna-worker
+    env_file:
+      - .env.local
+    environment:
+      DATABASE_URL: postgresql://janna:janna_dev_password@postgres:5432/janna_db
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: production
+    command: ["node", "dist/workers/ingestionWorker.js"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:

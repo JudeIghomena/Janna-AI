@@ -1,0 +1,200 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ──────────────────────────────────────────
+  # Lint + Typecheck
+  # ──────────────────────────────────────────
+  lint-typecheck:
+    name: Lint & Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+  # ──────────────────────────────────────────
+  # Test
+  # ──────────────────────────────────────────
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: janna
+          POSTGRES_PASSWORD: janna_test
+          POSTGRES_DB: janna_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @janna/api exec prisma generate
+        env:
+          DATABASE_URL: postgresql://janna:janna_test@localhost:5432/janna_test
+
+      - name: Run migrations
+        run: pnpm --filter @janna/api exec prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://janna:janna_test@localhost:5432/janna_test
+
+      - name: Run tests
+        run: pnpm test
+        env:
+          DATABASE_URL: postgresql://janna:janna_test@localhost:5432/janna_test
+          REDIS_URL: redis://localhost:6379
+          NODE_ENV: test
+
+  # ──────────────────────────────────────────
+  # Build
+  # ──────────────────────────────────────────
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [lint-typecheck]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @janna/api exec prisma generate
+        env:
+          DATABASE_URL: postgresql://placeholder:placeholder@localhost:5432/janna_db
+
+      - name: Build API
+        run: pnpm --filter @janna/api build
+
+      - name: Build Web
+        run: pnpm --filter @janna/web build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3001
+          NEXT_PUBLIC_COGNITO_USER_POOL_ID: us-east-1_placeholder
+          NEXT_PUBLIC_COGNITO_CLIENT_ID: placeholder
+          NEXT_PUBLIC_COGNITO_REGION: us-east-1
+
+      - name: Build CDK
+        run: pnpm --filter @janna/infra build
+
+  # ──────────────────────────────────────────
+  # Docker build check
+  # ──────────────────────────────────────────
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build API Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ──────────────────────────────────────────
+  # Deploy to Dev (on main push)
+  # ──────────────────────────────────────────
+  deploy-dev:
+    name: Deploy to Dev
+    runs-on: ubuntu-latest
+    needs: [test, docker-build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: dev
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: CDK Deploy Dev
+        run: pnpm --filter @janna/infra cdk deploy --all --require-approval never -c env=dev
+        env:
+          CDK_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+          CDK_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
