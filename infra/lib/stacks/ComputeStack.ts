@@ -205,6 +205,8 @@ export class ComputeStack extends cdk.Stack {
       taskRole,
       executionRole,
       dockerfileDir: path.join(monorepoRoot, 'apps', 'backend'),
+      buildContext: monorepoRoot,
+      dockerfile: 'apps/backend/Dockerfile',
       containerName: 'backend',
       containerPort: 3001,
       environment: commonEnv,
@@ -225,6 +227,8 @@ export class ComputeStack extends cdk.Stack {
       taskRole,
       executionRole,
       dockerfileDir: path.join(monorepoRoot, 'apps', 'worker'),
+      buildContext: monorepoRoot,
+      dockerfile: 'apps/worker/Dockerfile',
       containerName: 'worker',
       containerPort: 3002, // unused but required by construct type
       environment: {

@@ -1,3 +1,4 @@
+import * as path from 'path';
 import * as cdk from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
@@ -15,6 +16,17 @@ export interface EcsServiceProps {
   taskRole: iam.Role;
   executionRole: iam.Role;
   dockerfileDir: string;
+  /** 
+   * Optional: the Docker build context root. Defaults to dockerfileDir.
+   * For monorepo builds, set to the monorepo root and provide dockerfile
+   * as the relative path from buildContext to the Dockerfile.
+   */
+  buildContext?: string;
+  /**
+   * Path to the Dockerfile, relative to buildContext (or dockerfileDir if
+   * buildContext is not set). Defaults to 'Dockerfile'.
+   */
+  dockerfile?: string;
   containerName: string;
   containerPort: number;
   environment: Record<string, string>;
@@ -42,6 +54,8 @@ export class EcsService extends Construct {
       taskRole,
       executionRole,
       dockerfileDir,
+      buildContext,
+      dockerfile,
       containerName,
       containerPort,
       environment,
@@ -53,10 +67,27 @@ export class EcsService extends Construct {
       targetGroup,
     } = props;
 
+    // The Docker build context — defaults to dockerfileDir for single-app repos.
+    // For monorepos, use the monorepo root and pass the Dockerfile path via `dockerfile`.
+    const imageDirectory = buildContext ?? dockerfileDir;
+    const dockerfilePath = dockerfile
+      ?? (buildContext ? path.relative(buildContext, path.join(dockerfileDir, 'Dockerfile')) : undefined);
+
     // ─── Docker image (build from local context) ───────────────────────────────
     const image = new ecr_assets.DockerImageAsset(this, 'Image', {
-      directory: dockerfileDir,
+      directory: imageDirectory,
+      ...(dockerfilePath ? { file: dockerfilePath } : {}),
       target: 'production',
+      // Exclude large non-essential directories from build context
+      exclude: [
+        'node_modules',
+        '.next',
+        'cdk.out',
+        '.git',
+        'infra/cdk.out',
+        '**/.next',
+        '**/cdk.out',
+      ],
     });
 
     // ─── Log group ────────────────────────────────────────────────────────────
