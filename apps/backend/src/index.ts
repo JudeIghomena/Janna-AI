@@ -113,10 +113,18 @@ async function start() {
     await prisma.$connect();
     fastify.log.info('Database connected');
 
-    // Warm up Redis
-    const redis = getRedis();
-    await redis.connect();
-    fastify.log.info('Redis connected');
+    // Warm up Redis (non-fatal — the /health endpoint reports degraded state if Redis
+    // is unavailable; the server must start even if Redis has a transient TLS issue)
+    try {
+      const redis = getRedis();
+      await redis.connect();
+      fastify.log.info('Redis connected');
+    } catch (redisErr) {
+      fastify.log.warn(
+        { err: redisErr },
+        'Redis warm-up failed — server starting in degraded mode'
+      );
+    }
 
     await fastify.listen({
       port: config.PORT,

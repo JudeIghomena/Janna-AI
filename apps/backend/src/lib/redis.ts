@@ -5,10 +5,19 @@ let redisClient: Redis | null = null;
 
 export function getRedis(): Redis {
   if (!redisClient) {
+    // ElastiCache has transitEncryptionEnabled=true so we must use rediss:// (TLS).
+    // rejectUnauthorized: false is safe here because this is a VPC-internal
+    // connection with no MITM exposure, and Alpine's ca-certificates bundle may
+    // not include the Amazon Trust Services Root CA used by ElastiCache.
+    const tlsOptions = config.REDIS_URL.startsWith('rediss://')
+      ? { rejectUnauthorized: false }
+      : undefined;
+
     redisClient = new Redis(config.REDIS_URL, {
       maxRetriesPerRequest: 3,
       lazyConnect: true,
       enableReadyCheck: true,
+      tls: tlsOptions,
       reconnectOnError: (err) => {
         const targetErrors = ['READONLY', 'ECONNRESET', 'ETIMEDOUT'];
         return targetErrors.some((e) => err.message.includes(e));
