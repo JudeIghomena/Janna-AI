@@ -6,7 +6,6 @@ RUN apk add --no-cache libc6-compat openssl
 
 # ─── Dependencies ─────────────────────────────────────────────────────────────
 FROM base AS deps
-# Copy workspace manifests only (cache layer)
 COPY package.json package-lock.json ./
 COPY apps/backend/package.json ./apps/backend/
 COPY packages/shared/package.json ./packages/shared/
@@ -17,6 +16,12 @@ FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY apps/backend ./apps/backend
 COPY packages/shared ./packages/shared
+
+# Build shared package first (produces packages/shared/dist used by backend)
+WORKDIR /app/packages/shared
+RUN npm run build
+
+# Build backend
 WORKDIR /app/apps/backend
 RUN npx prisma generate
 RUN npm run build
@@ -30,7 +35,12 @@ RUN apk add --no-cache libc6-compat openssl
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/apps/backend/dist ./dist
 COPY --from=builder /app/apps/backend/prisma ./prisma
-COPY --from=builder /app/apps/backend/node_modules/.prisma ./node_modules/.prisma
+# prisma generate outputs engine binaries to the *monorepo root* node_modules/.prisma
+# (schema.prisma output = "../../node_modules/@prisma/client" relative to apps/backend)
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
+# Shared dist is needed at runtime (required by node_modules/@janna/shared symlink)
+COPY --from=builder /app/packages/shared/dist /app/packages/shared/dist
 COPY apps/backend/package.json ./
 
 RUN addgroup --system --gid 1001 nodejs && \
