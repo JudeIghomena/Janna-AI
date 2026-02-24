@@ -39,7 +39,10 @@ COPY --from=builder /app/apps/backend/prisma ./prisma
 # (schema.prisma output = "../../node_modules/@prisma/client" relative to apps/backend)
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
-# Shared dist is needed at runtime (required by node_modules/@janna/shared symlink)
+# @janna/shared: node_modules/@janna/shared is a workspace symlink → ../packages/shared
+# Node.js needs package.json there to find the "main" entry (dist/index.js).
+# Without package.json the module resolution fails even though dist/ exists.
+COPY --from=builder /app/packages/shared/package.json /app/packages/shared/package.json
 COPY --from=builder /app/packages/shared/dist /app/packages/shared/dist
 COPY apps/backend/package.json ./
 

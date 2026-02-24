@@ -91,10 +91,12 @@ export class EcsService extends Construct {
     });
 
     // ─── Log group ────────────────────────────────────────────────────────────
+    // RETAIN so that logs survive stack rollbacks and can be inspected post-failure.
+    // Remember to manually delete old log groups before a full stack tear-down/recreate.
     const logGroup = new logs.LogGroup(this, 'LogGroup', {
       logGroupName: `/janna/${envName}/${containerName}`,
       retention: envName === 'prod' ? logs.RetentionDays.ONE_MONTH : logs.RetentionDays.ONE_WEEK,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
     // ─── Task Definition ──────────────────────────────────────────────────────

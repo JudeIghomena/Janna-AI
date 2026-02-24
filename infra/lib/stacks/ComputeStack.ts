@@ -156,14 +156,18 @@ export class ComputeStack extends cdk.Stack {
     this.ingestionQueue.grantSendMessages(taskRole);
     this.ingestionQueue.grantConsumeMessages(taskRole);
 
-    // Grant Secrets Manager access
+    // Grant Secrets Manager access to BOTH roles:
+    //   taskRole     — used at runtime by bootstrap.ts (AWS SDK calls inside the container)
+    //   executionRole — used by the ECS agent to inject secrets into container env vars
     appSecrets.grantRead(taskRole);
+    appSecrets.grantRead(executionRole);
     const dbSecret = secretsmanager.Secret.fromSecretCompleteArn(
       this,
       'DbSecretRef',
       dbSecretArn
     );
     dbSecret.grantRead(taskRole);
+    dbSecret.grantRead(executionRole);
 
     // Grant SSM for ECS Exec
     taskRole.addManagedPolicy(
@@ -195,11 +199,9 @@ export class ComputeStack extends cdk.Stack {
       PORT: '3001',
     };
 
-    const commonSecrets: Record<string, ecs.Secret> = {
-      _APP_SECRETS: ecs.Secret.fromSecretsManager(appSecrets),
-    };
-
     // ─── Backend Service ──────────────────────────────────────────────────────
+    // No ECS-level secrets injection — bootstrap.ts fetches DB + app secrets
+    // from Secrets Manager at runtime using APP_SECRETS_ARN / DB_SECRET_ARN.
     new EcsService(this, 'Backend', {
       envName,
       cluster,
@@ -213,7 +215,6 @@ export class ComputeStack extends cdk.Stack {
       containerName: 'backend',
       containerPort: 3001,
       environment: commonEnv,
-      secrets: commonSecrets,
       cpu: isProd ? 1024 : 512,
       memoryLimitMiB: isProd ? 2048 : 1024,
       desiredCount: isProd ? 2 : 1,
@@ -238,7 +239,6 @@ export class ComputeStack extends cdk.Stack {
         ...commonEnv,
         PORT: '3002',
       },
-      secrets: commonSecrets,
       cpu: isProd ? 1024 : 512,
       memoryLimitMiB: isProd ? 2048 : 1024,
       desiredCount: isProd ? 2 : 1,

@@ -46,7 +46,10 @@ COPY --from=builder /app/apps/worker/dist ./dist
 # Prisma engine binaries (generated at monorepo root level)
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
-# Shared dist is required by the @janna/shared npm-workspace symlink at runtime
+# @janna/shared: node_modules/@janna/shared is a workspace symlink → ../packages/shared
+# Node.js needs package.json there to find the "main" entry (dist/index.js).
+# Without package.json the module resolution fails even though dist/ exists.
+COPY --from=builder /app/packages/shared/package.json /app/packages/shared/package.json
 COPY --from=builder /app/packages/shared/dist /app/packages/shared/dist
 COPY apps/worker/package.json ./
 
