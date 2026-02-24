@@ -47,7 +47,7 @@ export class ComputeStack extends cdk.Stack {
     } = props;
 
     const isProd = envName === 'prod';
-    const monorepoRoot = path.resolve(__dirname, '..', '..', '..', '..');
+    const monorepoRoot = path.resolve(__dirname, '..', '..', '..') // infra/lib/stacks → 3 up = monorepo root;
 
     // ─── SQS Ingestion Queue ───────────────────────────────────────────────────
     const dlq = new sqs.Queue(this, 'IngestionDLQ', {

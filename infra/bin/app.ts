@@ -76,10 +76,12 @@ const compute = new ComputeStack(app, `${stackPrefix}-Compute`, {
   envName,
   vpc: network.vpc,
   albSecurityGroup: network.albSecurityGroup,
-  backendSecurityGroup: network.backendSecurityGroup,
-  workerSecurityGroup: network.workerSecurityGroup,
+  // NetworkStack uses a single ecsSecurityGroup for all ECS tasks
+  backendSecurityGroup: network.ecsSecurityGroup,
+  workerSecurityGroup: network.ecsSecurityGroup,
   attachmentsBucket: storage.attachmentsBucket,
-  dbSecretArn: database.secretArn,
+  // DatabaseStack exposes dbSecret (ISecret); pass the ARN string
+  dbSecretArn: database.dbSecret.secretArn,
   redisEndpoint: cache.redisEndpoint,
   redisPort: cache.redisPort,
   userPoolId: cognito.userPoolId,
