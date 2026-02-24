@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 
@@ -91,12 +92,12 @@ export async function extensionsRoutes(fastify: FastifyInstance) {
     // Upsert user extension
     const userExt = await prisma.userExtension.upsert({
       where: { userId_extensionId: { userId, extensionId: dbExtension.id } },
-      update: { enabled: body.enabled, config: body.config ?? {} },
+      update: { enabled: body.enabled, config: (body.config ?? {}) as Prisma.InputJsonValue },
       create: {
         userId,
         extensionId: dbExtension.id,
         enabled: body.enabled,
-        config: body.config ?? {},
+        config: (body.config ?? {}) as Prisma.InputJsonValue,
       },
     });
 

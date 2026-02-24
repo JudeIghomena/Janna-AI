@@ -1,4 +1,4 @@
-import Fastify from 'fastify';
+import Fastify, { FastifyError } from 'fastify';
 import helmet from '@fastify/helmet';
 import { config } from './config';
 import corsPlugin from './plugins/cors';
@@ -75,7 +75,7 @@ async function bootstrap() {
   await registerRoutes(fastify);
 
   // ─── Global error handler ──────────────────────────────────────────────────
-  fastify.setErrorHandler((error, _request, reply) => {
+  fastify.setErrorHandler((error: FastifyError, _request, reply) => {
     fastify.log.error(error);
 
     if (error.validation) {

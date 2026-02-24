@@ -263,26 +263,18 @@ async function streamAnthropic(
     .map((m) => (typeof m.content === 'string' ? m.content : ''))
     .join('\n\n');
 
-  const anthropicMessages: Anthropic.MessageParam[] = conversationMessages.map(
-    (m) => ({
-      role: m.role === 'user' ? 'user' : 'assistant',
-      content:
-        typeof m.content === 'string'
-          ? m.content
-          : m.content
-              .map((b) =>
-                b.type === 'text'
-                  ? { type: 'text' as const, text: b.text ?? '' }
-                  : {
-                      type: 'image' as const,
-                      source: {
-                        type: 'url' as const,
-                        url: b.image_url?.url ?? '',
-                      },
-                    }
-              ),
-    })
-  );
+  // Anthropic SDK's ImageBlockParam.source requires base64 data (not URL).
+  // We cast here because we only send text in practice; URL-image support
+  // would require fetching + encoding before this point.
+  const anthropicMessages = conversationMessages.map((m) => ({
+    role: m.role === 'user' ? 'user' : 'assistant',
+    content:
+      typeof m.content === 'string'
+        ? m.content
+        : m.content
+            .filter((b) => b.type === 'text')
+            .map((b) => ({ type: 'text' as const, text: b.text ?? '' })),
+  })) as Anthropic.MessageParam[];
 
   const anthropicTools: Anthropic.Tool[] | undefined = opts.tools?.map((t) => ({
     name: t.name,

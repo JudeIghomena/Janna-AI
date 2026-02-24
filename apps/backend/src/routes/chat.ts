@@ -1,4 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { streamChat, GatewayMessage } from '../services/modelGateway';
@@ -184,11 +185,8 @@ export async function chatRoutes(fastify: FastifyInstance) {
         };
 
         // ─── First streaming pass ────────────────────────────────────────────
-        let pendingToolCall: {
-          id: string;
-          name: string;
-          input: Record<string, unknown>;
-        } | null = null;
+        type PendingToolCall = { id: string; name: string; input: Record<string, unknown> };
+        let pendingToolCall: PendingToolCall | null = null;
 
         await streamChat({
           messages: gatewayMessages,
@@ -221,8 +219,10 @@ export async function chatRoutes(fastify: FastifyInstance) {
         });
 
         // ─── Execute tool if requested ────────────────────────────────────────
-        if (pendingToolCall) {
-          const tc = pendingToolCall;
+        if (pendingToolCall !== null) {
+          // TypeScript control-flow narrowing loses track of variables mutated in async
+          // callbacks — use an explicit cast to recover the known non-null type.
+          const tc = pendingToolCall as PendingToolCall;
           const toolCtx = {
             userId: request.userId,
             conversationId,
@@ -369,7 +369,7 @@ export async function chatRoutes(fastify: FastifyInstance) {
       const currentMeta = (msg.metadata as MessageMetadata) ?? {};
       await prisma.message.update({
         where: { id: request.params.id },
-        data: { metadata: { ...currentMeta, thumbsUp: body.data.thumbsUp } },
+        data: { metadata: { ...currentMeta, thumbsUp: body.data.thumbsUp } as unknown as Prisma.InputJsonValue },
       });
 
       return reply.send({ ok: true });

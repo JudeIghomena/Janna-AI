@@ -64,8 +64,7 @@ export async function getObjectStream(s3Key: string): Promise<NodeJS.ReadableStr
   });
   const response = await client.send(command);
   if (!response.Body) throw new Error('No body in S3 response');
-  // @ts-expect-error - AWS SDK stream types
-  return response.Body as NodeJS.ReadableStream;
+  return response.Body as unknown as NodeJS.ReadableStream;
 }
 
 export async function getObjectBuffer(s3Key: string): Promise<Buffer> {
@@ -76,9 +75,8 @@ export async function getObjectBuffer(s3Key: string): Promise<Buffer> {
   });
   const response = await client.send(command);
   if (!response.Body) throw new Error('No body in S3 response');
-  // @ts-expect-error - AWS SDK stream types
   const chunks: Uint8Array[] = [];
-  // @ts-expect-error - AWS SDK stream types
+  // @ts-expect-error — AWS SDK Body is a union type; runtime is always AsyncIterable in Node
   for await (const chunk of response.Body) {
     chunks.push(chunk);
   }
