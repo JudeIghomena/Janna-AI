@@ -49,6 +49,8 @@ RUN addgroup --system --gid 1001 nodejs && \
 
 USER nodeapp
 EXPOSE 3001
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s CMD \
+# Extra start-period to allow bootstrap to fetch secrets before /health responds
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s CMD \
   wget -qO- http://localhost:3001/health || exit 1
-CMD ["node", "dist/index.js"]
+# bootstrap.js fetches DB + app secrets from Secrets Manager then requires index.js
+CMD ["node", "dist/bootstrap.js"]

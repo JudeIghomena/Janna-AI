@@ -182,11 +182,13 @@ export class ComputeStack extends cdk.Stack {
     const commonEnv: Record<string, string> = {
       NODE_ENV: isProd ? 'production' : 'development',
       AWS_REGION: this.region,
-      S3_BUCKET: attachmentsBucket.bucketName,
+      // S3_BUCKET_NAME — matches the key read by apps/backend/src/config.ts
+      S3_BUCKET_NAME: attachmentsBucket.bucketName,
       SQS_INGESTION_QUEUE_URL: this.ingestionQueue.queueUrl,
       REDIS_URL: `redis://${redisEndpoint}:${redisPort}`,
       COGNITO_USER_POOL_ID: userPoolId,
       COGNITO_CLIENT_ID: userPoolClientId,
+      // These ARNs are used by src/bootstrap.ts to fetch secrets at startup
       APP_SECRETS_ARN: appSecrets.secretArn,
       DB_SECRET_ARN: dbSecretArn,
       PORT: '3001',
