@@ -36,7 +36,7 @@ export class CacheStack extends cdk.Stack {
       replicationGroupId: `janna-${envName}`,
       cacheNodeType: isProd ? 'cache.r7g.large' : 'cache.t4g.micro',
       engine: 'redis',
-      engineVersion: '7.2',
+      engineVersion: '7.1',
       numCacheClusters: isProd ? 2 : 1,
       automaticFailoverEnabled: isProd,
       multiAzEnabled: isProd,
