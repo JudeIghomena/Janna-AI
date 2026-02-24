@@ -1,0 +1,240 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgvector(map: "vector", schema: "public")]
+}
+
+enum UserRole {
+  user
+  admin
+}
+
+enum MessageRole {
+  system
+  developer
+  user
+  assistant
+  tool
+}
+
+enum AttachmentStatus {
+  pending
+  processing
+  ready
+  error
+}
+
+enum ExtensionType {
+  web_search
+  code_interpreter
+  calculator
+  custom
+}
+
+model UserProfile {
+  id              String         @id           // Cognito sub
+  email           String         @unique
+  role            UserRole       @default(user)
+  disabled        Boolean        @default(false)
+  // Extended profile fields (Claude-like)
+  displayName     String?
+  bio             String?
+  avatarUrl       String?
+  preferences     Json           @default("{}")   // { theme, sendOnEnter, defaultModel, accentColor }
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  conversations   Conversation[]
+  attachments     Attachment[]
+  usageEvents     UsageEvent[]
+  apiKeys         ApiKey[]
+  projects        Project[]
+  extensions      UserExtension[]
+
+  @@index([email])
+  @@map("user_profiles")
+}
+
+model Project {
+  id              String         @id @default(cuid())
+  userId          String
+  name            String
+  description     String?
+  systemPrompt    String?        // Custom instructions for all conversations in this project
+  color           String         @default("#d97757") // Accent color
+  icon            String         @default("folder")
+  starred         Boolean        @default(false)
+  archived        Boolean        @default(false)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  user            UserProfile    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversations   Conversation[]
+
+  @@index([userId, archived, updatedAt(sort: Desc)])
+  @@map("projects")
+}
+
+model Conversation {
+  id                    String         @id @default(cuid())
+  userId                String
+  projectId             String?        // Optional: belongs to a project
+  title                 String         @default("New Conversation")
+  archived              Boolean        @default(false)
+  starred               Boolean        @default(false)
+  parentConversationId  String?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  user                  UserProfile    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project               Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  parent                Conversation?  @relation("ConversationBranch", fields: [parentConversationId], references: [id])
+  branches              Conversation[] @relation("ConversationBranch")
+  messages              Message[]
+  usageEvents           UsageEvent[]
+
+  @@index([userId, archived, updatedAt(sort: Desc)])
+  @@index([projectId])
+  @@map("conversations")
+}
+
+model Message {
+  id              String         @id @default(cuid())
+  conversationId  String
+  role            MessageRole
+  content         String
+  metadata        Json           @default("{}")
+  parentMessageId String?
+  createdAt       DateTime       @default(now())
+
+  conversation    Conversation   @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  parent          Message?       @relation("MessageBranch", fields: [parentMessageId], references: [id])
+  branches        Message[]      @relation("MessageBranch")
+  artifacts       Artifact[]
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+// Artifacts: rendered outputs (HTML, SVG, code, etc.) — like Claude Artifacts
+model Artifact {
+  id              String         @id @default(cuid())
+  messageId       String
+  type            String         // "html" | "svg" | "react" | "code" | "markdown" | "mermaid"
+  title           String
+  content         String
+  language        String?        // For code artifacts
+  createdAt       DateTime       @default(now())
+
+  message         Message        @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@map("artifacts")
+}
+
+model Attachment {
+  id             String           @id @default(cuid())
+  userId         String
+  conversationId String?
+  filename       String
+  mimeType       String
+  size           Int
+  s3Key          String           @unique
+  status         AttachmentStatus @default(pending)
+  errorMessage   String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  user           UserProfile      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chunks         DocumentChunk[]
+
+  @@index([userId, status])
+  @@index([conversationId])
+  @@map("attachments")
+}
+
+model DocumentChunk {
+  id           String   @id @default(cuid())
+  attachmentId String
+  chunkIndex   Int
+  content      String
+  embedding    Unsupported("vector(1536)")?
+  metadata     Json     @default("{}")
+  createdAt    DateTime @default(now())
+
+  attachment   Attachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+
+  @@index([attachmentId, chunkIndex])
+  @@map("document_chunks")
+}
+
+model UsageEvent {
+  id                String       @id @default(cuid())
+  userId            String
+  conversationId    String?
+  modelId           String
+  promptTokens      Int          @default(0)
+  completionTokens  Int          @default(0)
+  latencyMs         Int          @default(0)
+  costEstimate      Float        @default(0)
+  createdAt         DateTime     @default(now())
+
+  user              UserProfile  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation      Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([conversationId])
+  @@map("usage_events")
+}
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  userId      String
+  label       String
+  hashedKey   String    @unique
+  createdAt   DateTime  @default(now())
+  revokedAt   DateTime?
+  lastUsedAt  DateTime?
+
+  user        UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("api_keys")
+}
+
+// Extensions: available tool integrations (web search, code runner, etc.)
+model Extension {
+  id          String        @id @default(cuid())
+  type        ExtensionType
+  name        String
+  description String
+  iconUrl     String?
+  configSchema Json         @default("{}")  // JSON schema for config form
+  createdAt   DateTime      @default(now())
+
+  userExtensions UserExtension[]
+
+  @@map("extensions")
+}
+
+// UserExtension: per-user enabled extensions with config
+model UserExtension {
+  id          String    @id @default(cuid())
+  userId      String
+  extensionId String
+  enabled     Boolean   @default(true)
+  config      Json      @default("{}")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user        UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  extension   Extension   @relation(fields: [extensionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, extensionId])
+  @@index([userId])
+  @@map("user_extensions")
+}

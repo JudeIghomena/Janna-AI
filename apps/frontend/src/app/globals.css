@@ -1,0 +1,224 @@
+@import url('https://fonts.googleapis.com/css2?family=Styrene+A:ital,wght@0,400;0,500;0,700;1,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Design Tokens — Claude-like warm palette ───────────────────────────────── */
+:root {
+  /* Brand accent — Claude's signature orange */
+  --accent: oklch(65% 0.18 35);
+  --accent-hover: oklch(60% 0.2 35);
+  --accent-foreground: #ffffff;
+
+  /* Light mode — warm cream backgrounds */
+  --background: oklch(97% 0.008 85);         /* warm off-white */
+  --background-pure: oklch(100% 0 0);        /* pure white (cards) */
+  --foreground: oklch(20% 0.02 250);         /* near-black */
+  --surface: oklch(100% 0 0);               /* card white */
+  --surface-raised: oklch(96% 0.006 85);    /* slightly warmer */
+  --surface-overlay: oklch(93% 0.008 85);   /* dropdown bg */
+  --border: oklch(88% 0.01 85);             /* warm border */
+  --ring: oklch(65% 0.18 35);               /* focus ring = accent */
+  --muted: oklch(94% 0.006 85);
+  --muted-foreground: oklch(52% 0.01 250);
+  --destructive: oklch(55% 0.22 27);
+  --destructive-foreground: oklch(100% 0 0);
+  --success: oklch(55% 0.17 152);
+  --success-foreground: oklch(100% 0 0);
+
+  /* Sidebar — Claude's dark left panel */
+  --sidebar-bg: oklch(20% 0.01 250);
+  --sidebar-fg: oklch(85% 0.01 85);
+  --sidebar-hover: oklch(27% 0.01 250);
+  --sidebar-active: oklch(32% 0.01 250);
+  --sidebar-border: oklch(30% 0.01 250);
+  --sidebar-muted: oklch(55% 0.01 250);
+}
+
+.dark {
+  --background: oklch(17% 0.01 250);
+  --background-pure: oklch(20% 0.01 250);
+  --foreground: oklch(93% 0.005 85);
+  --surface: oklch(22% 0.01 250);
+  --surface-raised: oklch(26% 0.01 250);
+  --surface-overlay: oklch(29% 0.01 250);
+  --border: oklch(32% 0.01 250);
+  --ring: oklch(65% 0.18 35);
+  --muted: oklch(27% 0.01 250);
+  --muted-foreground: oklch(60% 0.01 250);
+  --destructive: oklch(60% 0.22 27);
+  --destructive-foreground: oklch(100% 0 0);
+  --success: oklch(60% 0.17 152);
+  --success-foreground: oklch(100% 0 0);
+
+  /* Dark mode sidebar — slightly lighter */
+  --sidebar-bg: oklch(14% 0.01 250);
+  --sidebar-fg: oklch(85% 0.01 85);
+  --sidebar-hover: oklch(22% 0.01 250);
+  --sidebar-active: oklch(26% 0.01 250);
+  --sidebar-border: oklch(24% 0.01 250);
+  --sidebar-muted: oklch(52% 0.01 250);
+}
+
+/* ─── Base ───────────────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  border-color: var(--border);
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: 'Styrene A', 'Inter', system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* ─── Tailwind custom classes ────────────────────────────────────────────────── */
+@layer utilities {
+  .bg-background { background-color: var(--background); }
+  .bg-background-pure { background-color: var(--background-pure); }
+  .bg-surface { background-color: var(--surface); }
+  .bg-surface-raised { background-color: var(--surface-raised); }
+  .bg-surface-overlay { background-color: var(--surface-overlay); }
+  .bg-accent { background-color: var(--accent); }
+  .bg-muted { background-color: var(--muted); }
+
+  .text-foreground { color: var(--foreground); }
+  .text-muted-foreground { color: var(--muted-foreground); }
+  .text-accent { color: var(--accent); }
+  .text-accent-foreground { color: var(--accent-foreground); }
+
+  .border-border { border-color: var(--border); }
+  .border-accent { border-color: var(--accent); }
+
+  /* Sidebar utilities */
+  .bg-sidebar { background-color: var(--sidebar-bg); }
+  .text-sidebar-fg { color: var(--sidebar-fg); }
+  .text-sidebar-muted { color: var(--sidebar-muted); }
+  .border-sidebar { border-color: var(--sidebar-border); }
+  .hover\:bg-sidebar-hover:hover { background-color: var(--sidebar-hover); }
+  .bg-sidebar-active { background-color: var(--sidebar-active); }
+
+  /* Animations */
+  .animate-fade-in {
+    animation: fadeIn 0.15s ease-out;
+  }
+  .animate-slide-in-left {
+    animation: slideInLeft 0.18s ease-out;
+  }
+  .animate-slide-in-right {
+    animation: slideInRight 0.18s ease-out;
+  }
+  .animate-scale-in {
+    animation: scaleIn 0.12s ease-out;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* ─── Scrollbars ─────────────────────────────────────────────────────────────── */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar { width: 5px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 9999px;
+}
+
+/* Sidebar scrollbar — dark themed */
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sidebar-active) transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar { width: 4px; }
+.sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background-color: var(--sidebar-active);
+  border-radius: 9999px;
+}
+
+/* ─── Syntax highlighting (Catppuccin Mocha) ─────────────────────────────────── */
+.hljs { background: transparent !important; color: #cdd6f4; }
+.hljs-comment, .hljs-quote { color: #585b70; font-style: italic; }
+.hljs-doctag, .hljs-keyword, .hljs-template-tag, .hljs-type, .hljs-variable.language_ { color: #cba6f7; }
+.hljs-title, .hljs-title.class_, .hljs-title.function_ { color: #89b4fa; }
+.hljs-attr, .hljs-number, .hljs-operator, .hljs-variable { color: #fab387; }
+.hljs-regexp, .hljs-string { color: #a6e3a1; }
+.hljs-built_in { color: #89dceb; }
+.hljs-symbol, .hljs-deletion { color: #f38ba8; }
+.hljs-section, .hljs-emphasis { color: #f9e2af; }
+.hljs-addition { color: #a6e3a1; }
+
+/* ─── Prose overrides ────────────────────────────────────────────────────────── */
+.prose :where(pre):not(:where([class~="not-prose"] *)) {
+  padding: 0;
+  background: transparent;
+}
+
+.prose :where(code):not(:where([class~="not-prose"] *)):not(:where(pre *)):before,
+.prose :where(code):not(:where([class~="not-prose"] *)):not(:where(pre *)):after {
+  content: none;
+}
+
+/* Larger, more readable body text in prose */
+.prose { font-size: 15px; line-height: 1.7; }
+.prose p { margin-bottom: 1em; }
+
+/* ─── Focus ring ─────────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* ─── Dialog ─────────────────────────────────────────────────────────────────── */
+dialog::backdrop {
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+}
+
+/* ─── Artifact iframe sandbox ────────────────────────────────────────────────── */
+.artifact-frame {
+  border: none;
+  width: 100%;
+  height: 100%;
+  background: white;
+  border-radius: 8px;
+}
+
+/* ─── User avatar gradient ───────────────────────────────────────────────────── */
+.avatar-gradient {
+  background: linear-gradient(135deg, var(--accent) 0%, oklch(65% 0.2 280) 100%);
+}

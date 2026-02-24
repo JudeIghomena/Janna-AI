@@ -1,0 +1,25 @@
+{
+  "name": "@janna/infra",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "synth": "cdk synth",
+    "deploy:dev": "cdk deploy --all --require-approval never --context env=dev",
+    "deploy:prod": "cdk deploy --all --context env=prod",
+    "diff": "cdk diff",
+    "destroy:dev": "cdk destroy --all --context env=dev",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf cdk.out dist"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.173.0",
+    "constructs": "^10.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "aws-cdk": "^2.173.0",
+    "typescript": "^5.7.0"
+  }
+}

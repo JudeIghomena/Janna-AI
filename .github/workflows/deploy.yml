@@ -1,0 +1,160 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'dev'
+        type: choice
+        options: [dev, prod]
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false  # never cancel in-flight deploys
+
+env:
+  NODE_VERSION: '20'
+  AWS_REGION: us-east-1
+
+jobs:
+  # ─── Deploy Dev (auto on push to main) ───────────────────────────────────────
+  deploy-dev:
+    name: Deploy → Dev
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'dev')
+    environment:
+      name: development
+      url: https://dev.janna.ai
+    permissions:
+      id-token: write  # OIDC
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_DEV }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install infra dependencies
+        run: npm ci
+        working-directory: infra
+
+      - name: Generate Prisma client
+        run: npm run db:generate --workspace=apps/backend
+
+      - name: CDK deploy (dev)
+        run: |
+          npx cdk deploy \
+            --context envName=dev \
+            --all \
+            --require-approval never \
+            --outputs-file cdk-outputs-dev.json \
+            --progress events
+        working-directory: infra
+
+      - name: Upload CDK outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: cdk-outputs-dev
+          path: infra/cdk-outputs-dev.json
+
+      - name: Run DB migrations
+        run: |
+          # Extract DB secret ARN from CDK outputs and run migrations via ECS Exec
+          DB_SECRET_ARN=$(cat infra/cdk-outputs-dev.json | jq -r '."Janna-Dev-Database".DbSecretArn // empty')
+          echo "Migrations would run here against dev DB"
+        env:
+          AWS_REGION: ${{ env.AWS_REGION }}
+
+  # ─── Deploy Prod (manual approval) ───────────────────────────────────────────
+  deploy-prod:
+    name: Deploy → Prod
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod'
+    environment:
+      name: production
+      url: https://app.janna.ai
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_PROD }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install infra dependencies
+        run: npm ci
+        working-directory: infra
+
+      - name: Generate Prisma client
+        run: npm run db:generate --workspace=apps/backend
+
+      - name: CDK diff (prod) — preview changes
+        run: npx cdk diff --context envName=prod --all
+        working-directory: infra
+
+      - name: CDK deploy (prod)
+        run: |
+          npx cdk deploy \
+            --context envName=prod \
+            --all \
+            --require-approval never \
+            --outputs-file cdk-outputs-prod.json \
+            --progress events
+        working-directory: infra
+
+      - name: Upload CDK outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: cdk-outputs-prod
+          path: infra/cdk-outputs-prod.json
+
+      - name: Notify Slack on success
+        if: success()
+        uses: slackapi/slack-github-action@v2
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": "✅ Janna AI deployed to *prod* by ${{ github.actor }} — <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
+            }
+
+      - name: Notify Slack on failure
+        if: failure()
+        uses: slackapi/slack-github-action@v2
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": "🔴 Janna AI prod deploy *FAILED* — <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
+            }

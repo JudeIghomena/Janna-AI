@@ -1,0 +1,63 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.*.local
+!.env.example
+!.env.local.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# TypeScript
+*.tsbuildinfo
+
+# Testing
+coverage/
+
+# CDK
+infra/cdk.out/
+
+# Prisma
+apps/backend/prisma/migrations/*.sql
+# SQLite dev databases
+*.db
+*.sqlite
+*.sqlite3
+# Generated Prisma client (regenerated on deploy)
+apps/backend/src/generated/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code — machine-specific config (absolute paths, session permissions)
+.claude/
+
+# Turborepo
+.turbo/
+
+# AWS
+.aws-sam/
+samconfig.toml
