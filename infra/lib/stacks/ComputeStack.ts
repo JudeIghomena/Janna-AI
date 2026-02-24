@@ -185,7 +185,8 @@ export class ComputeStack extends cdk.Stack {
       // S3_BUCKET_NAME — matches the key read by apps/backend/src/config.ts
       S3_BUCKET_NAME: attachmentsBucket.bucketName,
       SQS_INGESTION_QUEUE_URL: this.ingestionQueue.queueUrl,
-      REDIS_URL: `redis://${redisEndpoint}:${redisPort}`,
+      // rediss:// (double-s) = TLS — required because CacheStack sets transitEncryptionEnabled=true
+      REDIS_URL: `rediss://${redisEndpoint}:${redisPort}`,
       COGNITO_USER_POOL_ID: userPoolId,
       COGNITO_CLIENT_ID: userPoolClientId,
       // These ARNs are used by src/bootstrap.ts to fetch secrets at startup
